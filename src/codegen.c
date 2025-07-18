@@ -90,6 +90,12 @@ static void generate_statement(CodeGen* gen, ASTNode* node) {
             }
             break;
         }
+        case AST_ASSIGN_STMT: {
+            generate_expression(gen, node->assign_stmt.value);
+            int const_idx = add_constant(gen, node->assign_stmt.name);
+            emit_instruction(gen, OP_STORE_VAR, const_idx);
+            break;
+        }
         case AST_EXPR_STMT: {
             generate_expression(gen, node->expr_stmt.expression);
             break;
@@ -102,6 +108,21 @@ static void generate_statement(CodeGen* gen, ASTNode* node) {
             generate_statement(gen, node->if_stmt.then_stmt);
             
             // Update jump address
+            gen->instructions[jump_addr].operand = gen->count;
+            break;
+        }
+        case AST_WHILE_STMT: {
+            int loop_start = gen->count;
+            
+            generate_expression(gen, node->while_stmt.condition);
+            int jump_addr = gen->count;
+            emit_instruction(gen, OP_JUMP_IF_FALSE, 0); // placeholder
+            
+            generate_statement(gen, node->while_stmt.body);
+            
+            emit_instruction(gen, OP_JUMP, loop_start);
+            
+            // Update jump address to exit loop
             gen->instructions[jump_addr].operand = gen->count;
             break;
         }

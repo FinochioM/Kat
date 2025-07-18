@@ -243,6 +243,57 @@ static ASTNode* var_declaration(Parser* parser) {
     return node;
 }
 
+static ASTNode* var_declaration_or_assignment(Parser* parser) {
+    char* name = malloc(parser->current.length + 1);
+    strncpy(name, parser->current.start, parser->current.length);
+    name[parser->current.length] = '\0';
+    
+    advance(parser); // consume identifier
+    
+    if (match(parser, TOKEN_EQUAL)) {
+        // Simple assignment
+        ASTNode* node = create_node(AST_ASSIGN_STMT, parser->previous.line, parser->previous.column);
+        node->assign_stmt.name = name;
+        node->assign_stmt.value = expression(parser);
+        
+        consume(parser, TOKEN_SEMICOLON, "Expected ';' after assignment");
+        return node;
+    } else {
+        // Variable declaration (existing logic)
+        ASTNode* node = create_node(AST_VAR_DECL, parser->previous.line, parser->previous.column);
+        node->var_decl.name = name;
+        node->var_decl.type = NULL;
+        node->var_decl.value = NULL;
+        
+        if (match(parser, TOKEN_COLON_EQUAL)) {
+            // Inferred type declaration
+            node->var_decl.is_inferred = 1;
+            node->var_decl.value = expression(parser);
+        } else if (match(parser, TOKEN_COLON)) {
+            // Explicit type declaration
+            node->var_decl.is_inferred = 0;
+            
+            consume(parser, TOKEN_IDENTIFIER, "Expected type name");
+            
+            char* type_name = malloc(parser->previous.length + 1);
+            strncpy(type_name, parser->previous.start, parser->previous.length);
+            type_name[parser->previous.length] = '\0';
+            
+            node->var_decl.type = create_node(AST_TYPE_EXPR, parser->previous.line, parser->previous.column);
+            node->var_decl.type->type_expr.name = type_name;
+            
+            if (match(parser, TOKEN_EQUAL)) {
+                node->var_decl.value = expression(parser);
+            }
+        } else {
+            error(parser, "Expected ':' or ':=' after variable name");
+        }
+        
+        consume(parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
+        return node;
+    }
+}
+
 static ASTNode* declaration(Parser* parser) {
     if (match(parser, TOKEN_PROC)) {
         return proc_declaration(parser);
@@ -291,6 +342,15 @@ static ASTNode* if_statement(Parser* parser) {
     return node;
 }
 
+static ASTNode* while_statement(Parser* parser) {
+    ASTNode* node = create_node(AST_WHILE_STMT, parser->previous.line, parser->previous.column);
+    
+    node->while_stmt.condition = expression(parser);
+    node->while_stmt.body = statement(parser);
+    
+    return node;
+}
+
 static ASTNode* return_statement(Parser* parser) {
     ASTNode* node = create_node(AST_RETURN_STMT, parser->previous.line, parser->previous.column);
     
@@ -328,6 +388,10 @@ static ASTNode* statement(Parser* parser) {
         return return_statement(parser);
     }
     
+    if (match(parser, TOKEN_WHILE)) {
+        return while_statement(parser);
+    }
+    
     // Check if it's a variable declaration (identifier followed by : or :=)
     if (check(parser, TOKEN_IDENTIFIER)) {
         // Save current state
@@ -338,12 +402,12 @@ static ASTNode* statement(Parser* parser) {
         // Advance to see next token
         advance(parser);
         
-        if (check(parser, TOKEN_COLON) || check(parser, TOKEN_COLON_EQUAL)) {
-            // Restore state and parse as variable declaration
+        if (check(parser, TOKEN_COLON) || check(parser, TOKEN_COLON_EQUAL) || check(parser, TOKEN_EQUAL)) {
+            // Restore state and parse as variable declaration or assignment
             *parser->lexer = saved_lexer;
             parser->current = saved_current;
             parser->previous = saved_previous;
-            return var_declaration(parser);
+            return var_declaration_or_assignment(parser);
         } else {
             // Restore state and parse as expression statement
             *parser->lexer = saved_lexer;
@@ -553,6 +617,10 @@ void print_ast(ASTNode* node, int indent) {
                 print_ast(node->var_decl.value, indent + 1);
             }
             break;
+        case AST_ASSIGN_STMT:
+            printf("Assignment: %s\n", node->assign_stmt.name);
+            print_ast(node->assign_stmt.value, indent + 1);
+            break;
         case AST_BLOCK_STMT:
             printf("Block\n");
             for (int i = 0; i < node->block_stmt.statements->count; i++) {
@@ -566,6 +634,11 @@ void print_ast(ASTNode* node, int indent) {
             if (node->if_stmt.else_stmt) {
                 print_ast(node->if_stmt.else_stmt, indent + 1);
             }
+            break;
+        case AST_WHILE_STMT:
+            printf("While\n");
+            print_ast(node->while_stmt.condition, indent + 1);
+            print_ast(node->while_stmt.body, indent + 1);
             break;
         case AST_RETURN_STMT:
             printf("Return\n");
@@ -631,6 +704,10 @@ void free_ast(ASTNode* node) {
             free_ast(node->var_decl.type);
             free_ast(node->var_decl.value);
             break;
+        case AST_ASSIGN_STMT:
+            free(node->assign_stmt.name);
+            free_ast(node->assign_stmt.value);
+            break;
         case AST_BLOCK_STMT:
             if (node->block_stmt.statements) {
                 for (int i = 0; i < node->block_stmt.statements->count; i++) {
@@ -644,6 +721,10 @@ void free_ast(ASTNode* node) {
             free_ast(node->if_stmt.condition);
             free_ast(node->if_stmt.then_stmt);
             free_ast(node->if_stmt.else_stmt);
+            break;
+        case AST_WHILE_STMT:
+            free_ast(node->while_stmt.condition);
+            free_ast(node->while_stmt.body);
             break;
         case AST_RETURN_STMT:
             free_ast(node->return_stmt.value);

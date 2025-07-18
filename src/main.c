@@ -88,12 +88,10 @@ int main(int argc, char* argv[]) {
     
     const char* test_code = 
         "proc main() {\n"
-        "    x := 42;\n"
-        "    name := \"Hello, World!\";\n"
-        "    if x > 0 {\n"
-        "        print(name);\n"
-        "        y := 10 + 10;\n"
-        "        print(y);\n"
+        "    i := 0;\n"
+        "    while i < 3 {\n"
+        "        print(i);\n"
+        "        i = i + 1;\n"
         "    }\n"
         "    return 0;\n"
         "}\n";
