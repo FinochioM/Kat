@@ -9,7 +9,6 @@
 #define FIRST_RESERVED 256
 
 typedef enum {
-    // Single character tokens
     TOKEN_SEMICOLON = ';',
     TOKEN_COMMA = ',',
     TOKEN_DOT = '.',
@@ -35,7 +34,6 @@ typedef enum {
     TOKEN_PIPE = '|',
     TOKEN_TILDE = '~',
     
-    // Keywords (start at FIRST_RESERVED)
     TOKEN_IF = FIRST_RESERVED,
     TOKEN_ELSE,
     TOKEN_FOR,
@@ -80,42 +78,39 @@ typedef enum {
     TOKEN_TYPEID_OF,
     TOKEN_OFFSET_OF,
     
-    // Multi-character operators
-    TOKEN_COLON_EQUAL,      // :=
-    TOKEN_DOUBLE_EQUAL,     // ==
-    TOKEN_NOT_EQUAL,        // !=
-    TOKEN_LESS_EQUAL,       // <=
-    TOKEN_GREATER_EQUAL,    // >=
-    TOKEN_LOGICAL_AND,      // &&
-    TOKEN_LOGICAL_OR,       // ||
-    TOKEN_DOUBLE_COLON,     // ::
-    TOKEN_ARROW,            // ->
-    TOKEN_DOUBLE_DOT,       // ..
-    TOKEN_TRIPLE_DOT,       // ...
-    TOKEN_SHIFT_LEFT,       // <<
-    TOKEN_SHIFT_RIGHT,      // >>
-    TOKEN_PLUS_EQUAL,       // +=
-    TOKEN_MINUS_EQUAL,      // -=
-    TOKEN_STAR_EQUAL,       // *=
-    TOKEN_SLASH_EQUAL,      // /=
-    TOKEN_PERCENT_EQUAL,    // %=
-    TOKEN_CARET_EQUAL,      // ^=
-    TOKEN_AMPERSAND_EQUAL,  // &=
-    TOKEN_PIPE_EQUAL,       // |=
-    TOKEN_TILDE_EQUAL,      // ~=
-    TOKEN_SHIFT_LEFT_EQUAL, // <<=
-    TOKEN_SHIFT_RIGHT_EQUAL,// >>=
-    TOKEN_PLUS_PLUS,        // ++
-    TOKEN_MINUS_MINUS,      // --
-    TOKEN_QUESTION_QUESTION,// ??
+    TOKEN_COLON_EQUAL,
+    TOKEN_DOUBLE_EQUAL,
+    TOKEN_NOT_EQUAL,
+    TOKEN_LESS_EQUAL,
+    TOKEN_GREATER_EQUAL,
+    TOKEN_LOGICAL_AND,
+    TOKEN_LOGICAL_OR,
+    TOKEN_DOUBLE_COLON,
+    TOKEN_ARROW,
+    TOKEN_DOUBLE_DOT,
+    TOKEN_TRIPLE_DOT,
+    TOKEN_SHIFT_LEFT,
+    TOKEN_SHIFT_RIGHT,
+    TOKEN_PLUS_EQUAL,
+    TOKEN_MINUS_EQUAL,
+    TOKEN_STAR_EQUAL,
+    TOKEN_SLASH_EQUAL,
+    TOKEN_PERCENT_EQUAL,
+    TOKEN_CARET_EQUAL,
+    TOKEN_AMPERSAND_EQUAL,
+    TOKEN_PIPE_EQUAL,
+    TOKEN_TILDE_EQUAL,
+    TOKEN_SHIFT_LEFT_EQUAL,
+    TOKEN_SHIFT_RIGHT_EQUAL,
+    TOKEN_PLUS_PLUS,
+    TOKEN_MINUS_MINUS,
+    TOKEN_QUESTION_QUESTION,
     
-    // Literals
     TOKEN_IDENTIFIER,
     TOKEN_STRING,
     TOKEN_NUMBER,
     TOKEN_CHARACTER,
     
-    // Special
     TOKEN_NEWLINE,
     TOKEN_EOF,
     TOKEN_INVALID
@@ -142,4 +137,4 @@ Token lexer_next_token(Lexer* lexer);
 const char* token_type_to_string(TokenType type);
 void print_token(Token token);
 
-#endif // LEXER_H
+#endif

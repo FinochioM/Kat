@@ -94,7 +94,6 @@ static void enter_scope(CodeGen* gen) {
 }
 
 static void exit_scope(CodeGen* gen) {
-    // Remover variables locales del scope actual
     while (gen->local_count > 0 && 
            gen->locals[gen->local_count - 1].scope_level >= gen->scope_level) {
         free(gen->locals[gen->local_count - 1].name);
@@ -115,10 +114,8 @@ static int generate_expression(CodeGen* gen, ASTNode* node) {
         case AST_IDENTIFIER_EXPR: {
             int local_idx = find_local(gen, node->identifier_expr.name);
             if (local_idx != -1) {
-                // Variable local - ya está en registro
                 return gen->locals[local_idx].reg;
             } else {
-                // Variable global
                 int reg = gen->next_reg++;
                 int const_idx = add_constant(gen, node->identifier_expr.name);
                 emit_instruction(gen, OP_LOADGLOBAL, reg, const_idx, 0);
@@ -164,7 +161,6 @@ static int generate_expression(CodeGen* gen, ASTNode* node) {
             return result_reg;
         }
         case AST_CALL_EXPR: {
-            // Buscar función primero para saber cuántos argumentos espera
             int func_idx = -1;
             for (int i = 0; i < gen->func_count; i++) {
                 if (strcmp(gen->functions[i].name, node->call_expr.name) == 0) {
@@ -173,18 +169,15 @@ static int generate_expression(CodeGen* gen, ASTNode* node) {
                 }
             }
             
-            // Generar argumentos en registros consecutivos
             int base_reg = gen->next_reg;
             
             for (int i = 0; i < node->call_expr.args->count; i++) {
                 int arg_reg = generate_expression(gen, node->call_expr.args->nodes[i]);
-                // Si el argumento no está en el registro esperado, moverlo
                 if (arg_reg != base_reg + i) {
                     emit_instruction(gen, OP_MOVE, base_reg + i, arg_reg, 0);
                 }
             }
             
-            // Reservar registros para los argumentos
             gen->next_reg = base_reg + node->call_expr.args->count;
             
             int result_reg = gen->next_reg++;
@@ -192,7 +185,6 @@ static int generate_expression(CodeGen* gen, ASTNode* node) {
             if (func_idx != -1) {
                 emit_instruction(gen, OP_CALL_FUNC, result_reg, base_reg, func_idx);
             } else {
-                // Builtin function
                 int const_idx = add_constant(gen, node->call_expr.name);
                 emit_instruction(gen, OP_CALL, result_reg, const_idx, base_reg);
             }
@@ -223,11 +215,9 @@ static void generate_statement(CodeGen* gen, ASTNode* node) {
             int local_idx = find_local(gen, node->assign_stmt.name);
             
             if (local_idx != -1) {
-                // Variable local
                 int var_reg = gen->locals[local_idx].reg;
                 emit_instruction(gen, OP_MOVE, var_reg, value_reg, 0);
             } else {
-                // Variable global
                 int const_idx = add_constant(gen, node->assign_stmt.name);
                 emit_instruction(gen, OP_SETGLOBAL, value_reg, const_idx, 0);
             }
@@ -236,11 +226,10 @@ static void generate_statement(CodeGen* gen, ASTNode* node) {
         case AST_IF_STMT: {
             int cond_reg = generate_expression(gen, node->if_stmt.condition);
             int jump_addr = gen->count;
-            emit_instruction(gen, OP_TEST, cond_reg, 0, 0); // placeholder
+            emit_instruction(gen, OP_TEST, cond_reg, 0, 0);
             
             generate_statement(gen, node->if_stmt.then_stmt);
             
-            // Update jump address
             gen->instructions[jump_addr].B = gen->count;
             break;
         }
@@ -249,13 +238,12 @@ static void generate_statement(CodeGen* gen, ASTNode* node) {
             
             int cond_reg = generate_expression(gen, node->while_stmt.condition);
             int jump_addr = gen->count;
-            emit_instruction(gen, OP_TEST, cond_reg, 0, 0); // placeholder
+            emit_instruction(gen, OP_TEST, cond_reg, 0, 0);
             
             generate_statement(gen, node->while_stmt.body);
             
             emit_instruction(gen, OP_JMP, loop_start - gen->count - 1, 0, 0);
             
-            // Update jump address to exit loop
             gen->instructions[jump_addr].B = gen->count;
             break;
         }
@@ -285,25 +273,20 @@ static void generate_statement(CodeGen* gen, ASTNode* node) {
 }
 
 static void generate_function(CodeGen* gen, ASTNode* proc_node) {
-    // Guardar estado actual
     int saved_local_count = gen->local_count;
     int saved_next_reg = gen->next_reg;
     int saved_scope_level = gen->scope_level;
     
-    // Resetear para la función
     gen->scope_level = 0;
     gen->next_reg = 0;
     
-    // Agregar parámetros como variables locales
     for (int i = 0; i < proc_node->proc_decl.params->count; i++) {
         ASTNode* param = proc_node->proc_decl.params->nodes[i];
         add_local(gen, param->param_decl.name);
     }
     
-    // Generar cuerpo de la función
     generate_statement(gen, proc_node->proc_decl.body);
     
-    // Restaurar estado
     gen->local_count = saved_local_count;
     gen->next_reg = saved_next_reg;
     gen->scope_level = saved_scope_level;
@@ -319,9 +302,8 @@ static int add_function(CodeGen* gen, const char* name, int start_addr, int para
     gen->functions[gen->func_count].name = strdup(name);
     gen->functions[gen->func_count].start_addr = start_addr;
     gen->functions[gen->func_count].param_count = param_count;
-    gen->functions[gen->func_count].max_stack_size = 8; // Por ahora fijo
+    gen->functions[gen->func_count].max_stack_size = 8;
     
-    // Copiar nombres de parámetros
     gen->functions[gen->func_count].param_names = malloc(param_count * sizeof(char*));
     for (int i = 0; i < param_count; i++) {
         ASTNode* param = proc_node->proc_decl.params->nodes[i];
@@ -333,11 +315,9 @@ static int add_function(CodeGen* gen, const char* name, int start_addr, int para
 
 void generate_code(CodeGen* gen, ASTNode* node) {
     if (node->type == AST_PROGRAM) {
-        // Saltar sobre las funciones al inicio
         int jump_addr = gen->count;
-        emit_instruction(gen, OP_JMP, 0, 0, 0); // placeholder
+        emit_instruction(gen, OP_JMP, 0, 0, 0);
         
-        // Registrar todas las funciones
         for (int i = 0; i < node->program.declarations->count; i++) {
             ASTNode* decl = node->program.declarations->nodes[i];
             if (decl->type == AST_PROC_DECL) {
@@ -347,10 +327,8 @@ void generate_code(CodeGen* gen, ASTNode* node) {
             }
         }
         
-        // Actualizar el salto para ir al código principal
         gen->instructions[jump_addr].A = gen->count - jump_addr - 1;
         
-        // Llamar a main
         int main_func_idx = -1;
         for (int i = 0; i < gen->func_count; i++) {
             if (strcmp(gen->functions[i].name, "main") == 0) {

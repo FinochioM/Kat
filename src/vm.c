@@ -3,33 +3,119 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define GC_HEAP_GROW_FACTOR 2
+
 void vm_init(VM* vm) {
     vm->code = NULL;
     vm->ip = 0;
     vm->reg_top = 0;
     vm->global_count = 0;
     vm->call_stack_top = 0;
+    vm->objects = NULL;
+    vm->bytes_allocated = 0;
+    vm->next_gc = 1024 * 1024;
     
     for (int i = 0; i < GLOBALS_MAX; i++) {
         vm->global_names[i] = NULL;
     }
 }
 
+static GCObject* allocate_object(VM* vm, size_t size, GCType type) {
+    GCObject* object = (GCObject*)malloc(size);
+    object->type = type;
+    object->marked = 0;
+    object->next = vm->objects;
+    vm->objects = object;
+    
+    vm->bytes_allocated += size;
+    
+    if (vm->bytes_allocated > vm->next_gc) {
+        collect_garbage(vm);
+    }
+    
+    return object;
+}
+
+static GCString* allocate_string(VM* vm, const char* chars, int length) {
+    GCString* string = (GCString*)allocate_object(vm, sizeof(GCString), GC_STRING);
+    string->length = length;
+    string->chars = malloc(length + 1);
+    memcpy(string->chars, chars, length);
+    string->chars[length] = '\0';
+    return string;
+}
+
+static void free_object(VM* vm, GCObject* object) {
+    switch (object->type) {
+        case GC_STRING: {
+            GCString* string = (GCString*)object;
+            free(string->chars);
+            vm->bytes_allocated -= sizeof(GCString);
+            break;
+        }
+        case GC_FUNCTION:
+            vm->bytes_allocated -= sizeof(GCObject);
+            break;
+    }
+    free(object);
+}
+
 void vm_free(VM* vm) {
+    GCObject* object = vm->objects;
+    while (object != NULL) {
+        GCObject* next = object->next;
+        free_object(vm, object);
+        object = next;
+    }
+    
     for (int i = 0; i < vm->global_count; i++) {
         if (vm->global_names[i]) {
             free(vm->global_names[i]);
         }
-        if (vm->globals[i].type == VAL_STRING) {
-            free(vm->globals[i].as.string);
-        }
+    }
+}
+
+static void mark_object(GCObject* object) {
+    if (object == NULL) return;
+    if (object->marked) return;
+    object->marked = 1;
+}
+
+static void mark_value(Value value) {
+    if (value.type == VAL_STRING) {
+        mark_object((GCObject*)value.as.string);
+    }
+}
+
+static void mark_roots(VM* vm) {
+    for (int i = 0; i < vm->reg_top; i++) {
+        mark_value(vm->registers[i]);
     }
     
-    for (int i = 0; i < vm->reg_top; i++) {
-        if (vm->registers[i].type == VAL_STRING) {
-            free(vm->registers[i].as.string);
+    for (int i = 0; i < vm->global_count; i++) {
+        mark_value(vm->globals[i]);
+    }
+}
+
+static void sweep(VM* vm) {
+    GCObject** object = &vm->objects;
+    while (*object != NULL) {
+        if (!(*object)->marked) {
+            GCObject* unreached = *object;
+            *object = unreached->next;
+            free_object(vm, unreached);
+        } else {
+            (*object)->marked = 0;
+            object = &(*object)->next;
         }
     }
+}
+
+void collect_garbage(VM* vm) {
+    int before = vm->bytes_allocated;
+    mark_roots(vm);
+    sweep(vm);
+    vm->next_gc = vm->bytes_allocated * GC_HEAP_GROW_FACTOR;
 }
 
 static Value make_number(double value) {
@@ -39,10 +125,10 @@ static Value make_number(double value) {
     return val;
 }
 
-static Value make_string(const char* str) {
+static Value make_string(VM* vm, const char* str) {
     Value val;
     val.type = VAL_STRING;
-    val.as.string = strdup(str);
+    val.as.string = allocate_string(vm, str, strlen(str));
     return val;
 }
 
@@ -88,7 +174,7 @@ static Value get_global(VM* vm, const char* name) {
     int index = find_global(vm, name);
     
     if (index == -1) {
-        return make_nil(); // En lugar de error, retornar nil
+        return make_nil();
     }
     
     return vm->globals[index];
@@ -99,7 +185,7 @@ static int is_truthy(Value value) {
         case VAL_NIL: return 0;
         case VAL_BOOL: return value.as.boolean;
         case VAL_NUMBER: return value.as.number != 0;
-        case VAL_STRING: return strlen(value.as.string) > 0;
+        case VAL_STRING: return value.as.string->length > 0;
         default: return 1;
     }
 }
@@ -125,7 +211,7 @@ void vm_print_value(Value value) {
             }
             break;
         case VAL_STRING:
-            printf("%s", value.as.string);
+            printf("%s", value.as.string->chars);
             break;
     }
 }
@@ -146,7 +232,6 @@ int vm_run(VM* vm, CodeGen* code) {
             case OP_LOADK: {
                 const char* const_str = code->constants[instr.B];
                 
-                // Parse constant
                 char* endptr;
                 double num = strtod(const_str, &endptr);
                 
@@ -156,7 +241,7 @@ int vm_run(VM* vm, CodeGen* code) {
                     char* str = malloc(strlen(const_str) - 1);
                     strncpy(str, const_str + 1, strlen(const_str) - 2);
                     str[strlen(const_str) - 2] = '\0';
-                    vm->registers[instr.A] = make_string(str);
+                    vm->registers[instr.A] = make_string(vm, str);
                     free(str);
                 } else if (strcmp(const_str, "true") == 0) {
                     vm->registers[instr.A] = make_bool(1);
@@ -165,7 +250,7 @@ int vm_run(VM* vm, CodeGen* code) {
                 } else if (strcmp(const_str, "nil") == 0) {
                     vm->registers[instr.A] = make_nil();
                 } else {
-                    vm->registers[instr.A] = make_string(const_str);
+                    vm->registers[instr.A] = make_string(vm, const_str);
                 }
                 break;
             }
@@ -183,11 +268,7 @@ int vm_run(VM* vm, CodeGen* code) {
             }
             
             case OP_CALL: {
-                // Builtin function call
                 const char* func_name = code->constants[instr.B];
-                printf("DEBUG: Calling builtin %s with arg from R[%d]: ", func_name, instr.C);
-                vm_print_value(vm->registers[instr.C]);
-                printf("\n");
                 
                 if (strcmp(func_name, "print") == 0) {
                     builtin_print(vm, instr.C);
@@ -199,16 +280,6 @@ int vm_run(VM* vm, CodeGen* code) {
             case OP_CALL_FUNC: {
                 Function* func = &code->functions[instr.C];
                 
-                // Debug: imprimir información
-                printf("DEBUG: Calling function %s with %d params\n", func->name, func->param_count);
-                printf("DEBUG: Arguments from base register %d:\n", instr.B);
-                for (int i = 0; i < func->param_count; i++) {
-                    printf("  Arg %d: ", i);
-                    vm_print_value(vm->registers[instr.B + i]);
-                    printf("\n");
-                }
-                
-                // Crear nuevo frame
                 if (vm->call_stack_top >= CALL_STACK_MAX) {
                     fprintf(stderr, "Call stack overflow\n");
                     exit(1);
@@ -219,15 +290,10 @@ int vm_run(VM* vm, CodeGen* code) {
                 vm->call_stack[vm->call_stack_top].num_regs = func->max_stack_size;
                 vm->call_stack_top++;
                 
-                // Copiar argumentos a los registros de la función
                 for (int i = 0; i < func->param_count; i++) {
                     vm->registers[i] = vm->registers[instr.B + i];
-                    printf("DEBUG: Copying R[%d] to R[%d]: ", instr.B + i, i);
-                    vm_print_value(vm->registers[i]);
-                    printf("\n");
                 }
                 
-                // Saltar a la función
                 vm->ip = func->start_addr - 1;
                 break;
             }
@@ -236,20 +302,12 @@ int vm_run(VM* vm, CodeGen* code) {
                 Value result = vm->registers[instr.A];
                 
                 if (vm->call_stack_top > 0) {
-                    // Retornar de función
                     vm->call_stack_top--;
                     vm->ip = vm->call_stack[vm->call_stack_top].return_addr - 1;
                     
-                    // El resultado va en el registro especificado en la instrucción CALL_FUNC
-                    // que está en el registro A de esa instrucción
-                    int return_reg = vm->call_stack[vm->call_stack_top].base_reg;
-                    
-                    // Encontrar la instrucción CALL_FUNC que nos trajo aquí
-                    // El resultado debe ir en el registro A de esa instrucción
                     Instruction call_instr = code->instructions[vm->call_stack[vm->call_stack_top].return_addr - 1];
                     vm->registers[call_instr.A] = result;
                 } else {
-                    // Retornar del programa principal
                     vm_print_value(result);
                     printf("\n");
                     return 0;

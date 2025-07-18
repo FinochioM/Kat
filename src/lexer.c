@@ -73,19 +73,17 @@ static void skip_whitespace(Lexer* lexer) {
         if (c == ' ' || c == '\r' || c == '\t') {
             advance(lexer);
         } else if (c == '/' && peek_next(lexer) == '/') {
-            // Skip line comment
             while (peek(lexer) != '\n' && !is_at_end(lexer)) {
                 advance(lexer);
             }
         } else if (c == '/' && peek_next(lexer) == '*') {
-            // Skip block comment
-            advance(lexer); // consume '/'
-            advance(lexer); // consume '*'
+            advance(lexer);
+            advance(lexer);
             
             while (!is_at_end(lexer)) {
                 if (peek(lexer) == '*' && peek_next(lexer) == '/') {
-                    advance(lexer); // consume '*'
-                    advance(lexer); // consume '/'
+                    advance(lexer);
+                    advance(lexer);
                     break;
                 }
                 advance(lexer);
@@ -122,7 +120,6 @@ static Token string_token(Lexer* lexer) {
         return make_token(lexer, TOKEN_INVALID);
     }
     
-    // Closing quote
     advance(lexer);
     return make_token(lexer, TOKEN_STRING);
 }
@@ -132,9 +129,8 @@ static Token number_token(Lexer* lexer) {
         advance(lexer);
     }
     
-    // Look for decimal part
     if (peek(lexer) == '.' && isdigit(peek_next(lexer))) {
-        advance(lexer); // consume '.'
+        advance(lexer);
         
         while (isdigit(peek(lexer))) {
             advance(lexer);
@@ -149,7 +145,6 @@ static Token identifier_token(Lexer* lexer) {
         advance(lexer);
     }
     
-    // Check if it's a keyword
     int length = (int)(lexer->current - lexer->start);
     for (int i = 0; i < keyword_count; i++) {
         if (strlen(keywords[i]) == length && 
@@ -307,9 +302,9 @@ Token lexer_next_token(Lexer* lexer) {
         case '"': return string_token(lexer);
         case '\'': {
             if (is_at_end(lexer)) return make_token(lexer, TOKEN_INVALID);
-            advance(lexer); // consume character
+            advance(lexer);
             if (peek(lexer) != '\'') return make_token(lexer, TOKEN_INVALID);
-            advance(lexer); // consume closing quote
+            advance(lexer);
             return make_token(lexer, TOKEN_CHARACTER);
         }
     }

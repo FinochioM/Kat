@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Error handling
 static void error_at(Parser* parser, Token* token, const char* message) {
     if (parser->panic_mode) return;
     parser->panic_mode = 1;
@@ -12,7 +11,7 @@ static void error_at(Parser* parser, Token* token, const char* message) {
     if (token->type == TOKEN_EOF) {
         fprintf(stderr, " at end");
     } else if (token->type == TOKEN_INVALID) {
-        // Nothing
+        
     } else {
         fprintf(stderr, " at '%.*s'", token->length, token->start);
     }
@@ -29,7 +28,6 @@ static void error_at_current(Parser* parser, const char* message) {
     error_at(parser, &parser->current, message);
 }
 
-// Token management
 static void advance(Parser* parser) {
     parser->previous = parser->current;
     
@@ -84,7 +82,6 @@ static void synchronize(Parser* parser) {
     }
 }
 
-// AST helper functions
 ASTNode* create_node(ASTNodeType type, int line, int column) {
     ASTNode* node = malloc(sizeof(ASTNode));
     if (!node) {
@@ -128,12 +125,10 @@ void add_node_to_list(ASTNodeList* list, ASTNode* node) {
     list->nodes[list->count++] = node;
 }
 
-// Forward declarations
 static ASTNode* declaration(Parser* parser);
 static ASTNode* statement(Parser* parser);
 static ASTNode* expression(Parser* parser);
 
-// Parser functions
 static ASTNode* proc_declaration(Parser* parser) {
     consume(parser, TOKEN_IDENTIFIER, "Expected procedure name");
     
@@ -148,7 +143,6 @@ static ASTNode* proc_declaration(Parser* parser) {
     
     consume(parser, TOKEN_LPAREN, "Expected '(' after procedure name");
     
-    // Parse parameters
     if (!check(parser, TOKEN_RPAREN)) {
         do {
             consume(parser, TOKEN_IDENTIFIER, "Expected parameter name");
@@ -178,7 +172,6 @@ static ASTNode* proc_declaration(Parser* parser) {
     
     consume(parser, TOKEN_RPAREN, "Expected ')' after parameters");
     
-    // Parse return type
     if (match(parser, TOKEN_ARROW)) {
         consume(parser, TOKEN_IDENTIFIER, "Expected return type");
         
@@ -190,14 +183,12 @@ static ASTNode* proc_declaration(Parser* parser) {
         node->proc_decl.return_type->type_expr.name = return_type;
     }
     
-    // Parse body
     node->proc_decl.body = statement(parser);
     
     return node;
 }
 
 static ASTNode* var_declaration(Parser* parser) {
-    // Don't consume here - the identifier should already be current
     if (!check(parser, TOKEN_IDENTIFIER)) {
         error_at_current(parser, "Expected variable name");
         return NULL;
@@ -212,14 +203,12 @@ static ASTNode* var_declaration(Parser* parser) {
     node->var_decl.type = NULL;
     node->var_decl.value = NULL;
     
-    advance(parser); // Now consume the identifier
+    advance(parser);
     
     if (match(parser, TOKEN_COLON_EQUAL)) {
-        // Inferred type declaration
         node->var_decl.is_inferred = 1;
         node->var_decl.value = expression(parser);
     } else if (match(parser, TOKEN_COLON)) {
-        // Explicit type declaration
         node->var_decl.is_inferred = 0;
         
         consume(parser, TOKEN_IDENTIFIER, "Expected type name");
@@ -248,10 +237,9 @@ static ASTNode* var_declaration_or_assignment(Parser* parser) {
     strncpy(name, parser->current.start, parser->current.length);
     name[parser->current.length] = '\0';
     
-    advance(parser); // consume identifier
+    advance(parser);
     
     if (match(parser, TOKEN_EQUAL)) {
-        // Simple assignment
         ASTNode* node = create_node(AST_ASSIGN_STMT, parser->previous.line, parser->previous.column);
         node->assign_stmt.name = name;
         node->assign_stmt.value = expression(parser);
@@ -259,18 +247,15 @@ static ASTNode* var_declaration_or_assignment(Parser* parser) {
         consume(parser, TOKEN_SEMICOLON, "Expected ';' after assignment");
         return node;
     } else {
-        // Variable declaration (existing logic)
         ASTNode* node = create_node(AST_VAR_DECL, parser->previous.line, parser->previous.column);
         node->var_decl.name = name;
         node->var_decl.type = NULL;
         node->var_decl.value = NULL;
         
         if (match(parser, TOKEN_COLON_EQUAL)) {
-            // Inferred type declaration
             node->var_decl.is_inferred = 1;
             node->var_decl.value = expression(parser);
         } else if (match(parser, TOKEN_COLON)) {
-            // Explicit type declaration
             node->var_decl.is_inferred = 0;
             
             consume(parser, TOKEN_IDENTIFIER, "Expected type name");
@@ -311,7 +296,6 @@ static ASTNode* block_statement(Parser* parser) {
         
         ASTNode* stmt;
         
-        // Check if it's a top-level declaration or a statement
         if (check(parser, TOKEN_PROC) || check(parser, TOKEN_STRUCT) || check(parser, TOKEN_ENUM) || check(parser, TOKEN_UNION)) {
             stmt = declaration(parser);
         } else {
@@ -392,24 +376,19 @@ static ASTNode* statement(Parser* parser) {
         return while_statement(parser);
     }
     
-    // Check if it's a variable declaration (identifier followed by : or :=)
     if (check(parser, TOKEN_IDENTIFIER)) {
-        // Save current state
         Lexer saved_lexer = *parser->lexer;
         Token saved_current = parser->current;
         Token saved_previous = parser->previous;
         
-        // Advance to see next token
         advance(parser);
         
         if (check(parser, TOKEN_COLON) || check(parser, TOKEN_COLON_EQUAL) || check(parser, TOKEN_EQUAL)) {
-            // Restore state and parse as variable declaration or assignment
             *parser->lexer = saved_lexer;
             parser->current = saved_current;
             parser->previous = saved_previous;
             return var_declaration_or_assignment(parser);
         } else {
-            // Restore state and parse as expression statement
             *parser->lexer = saved_lexer;
             parser->current = saved_current;
             parser->previous = saved_previous;
@@ -565,7 +544,6 @@ static ASTNode* expression(Parser* parser) {
     return comparison_expression(parser);
 }
 
-// Public functions
 void parser_init(Parser* parser, Lexer* lexer) {
     parser->lexer = lexer;
     parser->had_error = 0;
@@ -676,7 +654,6 @@ void print_ast(ASTNode* node, int indent) {
 void free_ast(ASTNode* node) {
     if (!node) return;
     
-    // Free node-specific data
     switch (node->type) {
         case AST_PROGRAM:
             if (node->program.declarations) {
