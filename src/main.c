@@ -3,6 +3,7 @@
 #include <string.h>
 #include "lexer.h"
 #include "parser.h"
+#include "codegen.h"
 
 char* read_file(const char* filename) {
     FILE* file = fopen(filename, "r");
@@ -57,11 +58,18 @@ void test_parser(const char* source) {
     
     if (parser.had_error) {
         printf("Parser had errors.\n");
-    } else {
-        printf("AST:\n");
-        print_ast(ast, 0);
+        return;
     }
     
+    printf("AST:\n");
+    print_ast(ast, 0);
+    
+    CodeGen gen;
+    codegen_init(&gen);
+    generate_code(&gen, ast);
+    print_bytecode(&gen);
+    
+    codegen_free(&gen);
     free_ast(ast);
     printf("\n");
 }
