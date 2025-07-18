@@ -96,4 +96,7 @@ struct kat_State {
 #define katG_addinfo(K, msg, src, line) (msg)
 #define katD_throw(K, errcode) exit(errcode)
 
+/* Basic types */
+typedef unsigned char lu_byte;
+
 #endif

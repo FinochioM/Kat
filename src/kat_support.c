@@ -3,10 +3,11 @@
 
 /* Simple string creation */
 TString *katS_newlstr (kat_State *K, const char *str, size_t l) {
+    (void)K;
     for (int i = 0; i < NUM_RESERVED; i++) {
       if (strlen(katX_tokens[i]) == l && memcmp(katX_tokens[i], str, l) == 0) {
         TString *ts = (TString *)malloc(sizeof(TString) + l);
-        ts->extra = i + 1;  // Mark as reserved word
+        ts->extra = i + 1;
         ts->len = l;
         memcpy(ts->contents, str, l);
         ts->contents[l] = '\0';
@@ -15,7 +16,7 @@ TString *katS_newlstr (kat_State *K, const char *str, size_t l) {
     }
     
     TString *ts = (TString *)malloc(sizeof(TString) + l);
-    ts->extra = 0;  // Not reserved
+    ts->extra = 0;
     ts->len = l;
     memcpy(ts->contents, str, l);
     ts->contents[l] = '\0';
@@ -28,6 +29,7 @@ TString *katS_new (kat_State *K, const char *str) {
 
 /* Buffer management */
 void katZ_resizebuffer (kat_State *K, Mbuffer *buff, size_t size) {
+  (void)K;
   buff->buffer = (char *)realloc(buff->buffer, size);
   buff->buffsize = size;
   if (buff->n > size) buff->n = size;

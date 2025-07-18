@@ -2,7 +2,9 @@
 #include <string.h>
 #include "minimal_headers.h"
 #include "klex.h"
+#include "kparser.h"
 
+/* Reader function for string input */
 typedef struct StringReader {
   const char *str;
   size_t size;
@@ -27,21 +29,27 @@ void test_lexer(const char *code) {
   printf("\n=== Testing code: ===\n%s\n", code);
   printf("=== Tokens: ===\n");
   
+  /* Initialize */
   katX_init(K);
   
+  /* Setup string reader */
   sr.str = code;
   sr.size = strlen(code);
   
+  /* Setup ZIO */
   z.K = K;
   z.reader = string_reader;
   z.data = &sr;
   z.n = 0;
   z.p = NULL;
   
+  /* Create source name */
   source = katS_new(K, "test");
   
+  /* Initialize lexer */
   katX_setinput(K, &ls, &z, source, ' ');
   
+  /* Read and print tokens */
   do {
     katX_next(&ls);
     int token = ls.t.token;
@@ -68,17 +76,65 @@ void test_lexer(const char *code) {
   kat_close(K);
 }
 
-int main() {
-  printf("Kat Language Lexer Test\n");
-  printf("=======================\n");
+void test_parser(const char *code) {
+  kat_State *K = kat_newstate(NULL, NULL);
+  ZIO z;
+  StringReader sr;
+  TString *source;
+  ASTNode *ast;
   
+  printf("\n=== Parsing code: ===\n%s\n", code);
+  
+  /* Initialize */
+  katX_init(K);
+  
+  /* Setup string reader */
+  sr.str = code;
+  sr.size = strlen(code);
+  
+  /* Setup ZIO */
+  z.K = K;
+  z.reader = string_reader;
+  z.data = &sr;
+  z.n = 0;
+  z.p = NULL;
+  
+  /* Create source name */
+  source = katS_new(K, "test");
+  
+  /* Parse */
+  ast = katY_parser(K, &z, source, ' ');
+  
+  /* Clean up */
+  katY_freeAST(K, ast);
+  kat_close(K);
+}
+
+int main() {
+  printf("Kat Language Test\n");
+  printf("=================\n");
+  
+  printf("\n--- LEXER TESTS ---\n");
+  
+  /* Test basic tokens */
   test_lexer("main :: proc() {\n    x := 42\n    y : int = 10\n}");
   
+  /* Test strings and operators */
   test_lexer("name := \"hello world\"\nif x == y && z != 0 {\n    return true\n}");
   
-  test_lexer("// This is a comment\npi := 3.14159\ncount := 100\n/* block comment */");
+  printf("\n--- PARSER TESTS ---\n");
   
-  test_lexer("x := y -> z\na :: distinct int\nb := cast(int) c");
+  /* Test variable declarations */
+  test_parser("x := 42\ny : int = 10\nz :: 3.14");
+  
+  /* Test procedure */
+  test_parser("main :: proc() {\n    x := 42\n    return x\n}");
+  
+  /* Test control flow */
+  test_parser("if x > 0 {\n    y := 1\n} else {\n    y := 0\n}");
+  
+  /* Test loops */
+  test_parser("for i in items {\n    print(i)\n}");
   
   return 0;
 }
