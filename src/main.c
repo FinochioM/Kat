@@ -87,12 +87,13 @@ int main(int argc, char* argv[]) {
     printf("==========================\n\n");
     
     const char* test_code = 
+        "proc add(a, b) {\n"
+        "    return a + b;\n"
+        "}\n"
+        "\n"
         "proc main() {\n"
-        "    i := 0;\n"
-        "    while i < 3 {\n"
-        "        print(i);\n"
-        "        i = i + 1;\n"
-        "    }\n"
+        "    result := add(10, 20);\n"
+        "    print(result);\n"
         "    return 0;\n"
         "}\n";
     

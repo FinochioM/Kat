@@ -6,8 +6,9 @@
 void vm_init(VM* vm) {
     vm->code = NULL;
     vm->ip = 0;
-    vm->stack_top = 0;
+    vm->reg_top = 0;
     vm->global_count = 0;
+    vm->call_stack_top = 0;
     
     for (int i = 0; i < GLOBALS_MAX; i++) {
         vm->global_names[i] = NULL;
@@ -24,32 +25,11 @@ void vm_free(VM* vm) {
         }
     }
     
-    // Free stack strings
-    for (int i = 0; i < vm->stack_top; i++) {
-        if (vm->stack[i].type == VAL_STRING) {
-            free(vm->stack[i].as.string);
+    for (int i = 0; i < vm->reg_top; i++) {
+        if (vm->registers[i].type == VAL_STRING) {
+            free(vm->registers[i].as.string);
         }
     }
-}
-
-static void push(VM* vm, Value value) {
-    if (vm->stack_top >= STACK_MAX) {
-        fprintf(stderr, "Stack overflow\n");
-        exit(1);
-    }
-    vm->stack[vm->stack_top++] = value;
-}
-
-static Value pop(VM* vm) {
-    if (vm->stack_top <= 0) {
-        fprintf(stderr, "Stack underflow\n");
-        exit(1);
-    }
-    return vm->stack[--vm->stack_top];
-}
-
-static Value peek(VM* vm, int distance) {
-    return vm->stack[vm->stack_top - 1 - distance];
 }
 
 static Value make_number(double value) {
@@ -92,7 +72,6 @@ static void set_global(VM* vm, const char* name, Value value) {
     int index = find_global(vm, name);
     
     if (index == -1) {
-        // Create new global
         if (vm->global_count >= GLOBALS_MAX) {
             fprintf(stderr, "Too many globals\n");
             exit(1);
@@ -109,8 +88,7 @@ static Value get_global(VM* vm, const char* name) {
     int index = find_global(vm, name);
     
     if (index == -1) {
-        fprintf(stderr, "Undefined variable '%s'\n", name);
-        exit(1);
+        return make_nil(); // En lugar de error, retornar nil
     }
     
     return vm->globals[index];
@@ -126,23 +104,9 @@ static int is_truthy(Value value) {
     }
 }
 
-static void builtin_print(VM* vm) {
-    Value arg = pop(vm);
-    vm_print_value(arg);
+static void builtin_print(VM* vm, int arg_reg) {
+    vm_print_value(vm->registers[arg_reg]);
     printf("\n");
-    
-    if (arg.type == VAL_STRING) {
-        free(arg.as.string);
-    }
-}
-
-static void call_builtin(VM* vm, const char* name) {
-    if (strcmp(name, "print") == 0) {
-        builtin_print(vm);
-    } else {
-        fprintf(stderr, "Unknown function '%s'\n", name);
-        exit(1);
-    }
 }
 
 void vm_print_value(Value value) {
@@ -174,149 +138,202 @@ int vm_run(VM* vm, CodeGen* code) {
         Instruction instr = code->instructions[vm->ip];
         
         switch (instr.opcode) {
-            case OP_LOAD_CONST: {
-                const char* const_str = code->constants[instr.operand];
-                Value value;
+            case OP_MOVE: {
+                vm->registers[instr.A] = vm->registers[instr.B];
+                break;
+            }
+            
+            case OP_LOADK: {
+                const char* const_str = code->constants[instr.B];
                 
-                // Try to parse as number
+                // Parse constant
                 char* endptr;
                 double num = strtod(const_str, &endptr);
                 
                 if (*endptr == '\0') {
-                    // It's a number
-                    value = make_number(num);
+                    vm->registers[instr.A] = make_number(num);
                 } else if (const_str[0] == '"' && const_str[strlen(const_str) - 1] == '"') {
-                    // It's a string (remove quotes)
                     char* str = malloc(strlen(const_str) - 1);
                     strncpy(str, const_str + 1, strlen(const_str) - 2);
                     str[strlen(const_str) - 2] = '\0';
-                    value = make_string(str);
+                    vm->registers[instr.A] = make_string(str);
                     free(str);
                 } else if (strcmp(const_str, "true") == 0) {
-                    value = make_bool(1);
+                    vm->registers[instr.A] = make_bool(1);
                 } else if (strcmp(const_str, "false") == 0) {
-                    value = make_bool(0);
+                    vm->registers[instr.A] = make_bool(0);
                 } else if (strcmp(const_str, "nil") == 0) {
-                    value = make_nil();
+                    vm->registers[instr.A] = make_nil();
                 } else {
-                    // Treat as string
-                    value = make_string(const_str);
+                    vm->registers[instr.A] = make_string(const_str);
                 }
-                
-                push(vm, value);
                 break;
             }
             
-            case OP_LOAD_VAR: {
-                const char* name = code->constants[instr.operand];
-                Value value = get_global(vm, name);
-                push(vm, value);
+            case OP_LOADGLOBAL: {
+                const char* name = code->constants[instr.B];
+                vm->registers[instr.A] = get_global(vm, name);
                 break;
             }
             
-            case OP_STORE_VAR: {
-                const char* name = code->constants[instr.operand];
-                Value value = pop(vm);
-                set_global(vm, name, value);
+            case OP_SETGLOBAL: {
+                const char* name = code->constants[instr.B];
+                set_global(vm, name, vm->registers[instr.A]);
                 break;
             }
             
             case OP_CALL: {
-                const char* name = code->constants[instr.operand];
-                call_builtin(vm, name);
-                break;
-            }
-            
-            case OP_COMPARE: {
-                Value right = pop(vm);
-                Value left = pop(vm);
+                // Builtin function call
+                const char* func_name = code->constants[instr.B];
+                printf("DEBUG: Calling builtin %s with arg from R[%d]: ", func_name, instr.C);
+                vm_print_value(vm->registers[instr.C]);
+                printf("\n");
                 
-                int result = 0;
-                
-                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
-                    switch (instr.operand) {
-                        case TOKEN_GREATER:
-                            result = left.as.number > right.as.number;
-                            break;
-                        case TOKEN_GREATER_EQUAL:
-                            result = left.as.number >= right.as.number;
-                            break;
-                        case TOKEN_LESS:
-                            result = left.as.number < right.as.number;
-                            break;
-                        case TOKEN_LESS_EQUAL:
-                            result = left.as.number <= right.as.number;
-                            break;
-                        case TOKEN_DOUBLE_EQUAL:
-                            result = left.as.number == right.as.number;
-                            break;
-                        case TOKEN_NOT_EQUAL:
-                            result = left.as.number != right.as.number;
-                            break;
-                    }
-                }
-                
-                push(vm, make_bool(result));
-                break;
-            }
-            
-            case OP_JUMP_IF_FALSE: {
-                Value condition = pop(vm);
-                if (!is_truthy(condition)) {
-                    vm->ip = instr.operand - 1; // -1 because we increment at end
+                if (strcmp(func_name, "print") == 0) {
+                    builtin_print(vm, instr.C);
+                    vm->registers[instr.A] = make_nil();
                 }
                 break;
             }
             
-            case OP_JUMP: {
-                vm->ip = instr.operand - 1; // -1 because we increment at end
+            case OP_CALL_FUNC: {
+                Function* func = &code->functions[instr.C];
+                
+                // Debug: imprimir información
+                printf("DEBUG: Calling function %s with %d params\n", func->name, func->param_count);
+                printf("DEBUG: Arguments from base register %d:\n", instr.B);
+                for (int i = 0; i < func->param_count; i++) {
+                    printf("  Arg %d: ", i);
+                    vm_print_value(vm->registers[instr.B + i]);
+                    printf("\n");
+                }
+                
+                // Crear nuevo frame
+                if (vm->call_stack_top >= CALL_STACK_MAX) {
+                    fprintf(stderr, "Call stack overflow\n");
+                    exit(1);
+                }
+                
+                vm->call_stack[vm->call_stack_top].return_addr = vm->ip + 1;
+                vm->call_stack[vm->call_stack_top].base_reg = instr.B;
+                vm->call_stack[vm->call_stack_top].num_regs = func->max_stack_size;
+                vm->call_stack_top++;
+                
+                // Copiar argumentos a los registros de la función
+                for (int i = 0; i < func->param_count; i++) {
+                    vm->registers[i] = vm->registers[instr.B + i];
+                    printf("DEBUG: Copying R[%d] to R[%d]: ", instr.B + i, i);
+                    vm_print_value(vm->registers[i]);
+                    printf("\n");
+                }
+                
+                // Saltar a la función
+                vm->ip = func->start_addr - 1;
                 break;
             }
             
             case OP_RETURN: {
-                if (vm->stack_top > 0) {
-                    Value result = pop(vm);
+                Value result = vm->registers[instr.A];
+                
+                if (vm->call_stack_top > 0) {
+                    // Retornar de función
+                    vm->call_stack_top--;
+                    vm->ip = vm->call_stack[vm->call_stack_top].return_addr - 1;
+                    
+                    // El resultado va en el registro especificado en la instrucción CALL_FUNC
+                    // que está en el registro A de esa instrucción
+                    int return_reg = vm->call_stack[vm->call_stack_top].base_reg;
+                    
+                    // Encontrar la instrucción CALL_FUNC que nos trajo aquí
+                    // El resultado debe ir en el registro A de esa instrucción
+                    Instruction call_instr = code->instructions[vm->call_stack[vm->call_stack_top].return_addr - 1];
+                    vm->registers[call_instr.A] = result;
+                } else {
+                    // Retornar del programa principal
                     vm_print_value(result);
                     printf("\n");
+                    return 0;
                 }
-                return 0;
+                break;
+            }
+            
+            case OP_JMP: {
+                vm->ip += instr.A;
+                break;
+            }
+            
+            case OP_TEST: {
+                if (!is_truthy(vm->registers[instr.A])) {
+                    vm->ip = instr.B - 1;
+                }
+                break;
+            }
+            
+            case OP_ADD: {
+                Value left = vm->registers[instr.B];
+                Value right = vm->registers[instr.C];
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    vm->registers[instr.A] = make_number(left.as.number + right.as.number);
+                }
+                break;
+            }
+            
+            case OP_SUB: {
+                Value left = vm->registers[instr.B];
+                Value right = vm->registers[instr.C];
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    vm->registers[instr.A] = make_number(left.as.number - right.as.number);
+                }
+                break;
+            }
+            
+            case OP_MUL: {
+                Value left = vm->registers[instr.B];
+                Value right = vm->registers[instr.C];
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    vm->registers[instr.A] = make_number(left.as.number * right.as.number);
+                }
+                break;
+            }
+            
+            case OP_DIV: {
+                Value left = vm->registers[instr.B];
+                Value right = vm->registers[instr.C];
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    vm->registers[instr.A] = make_number(left.as.number / right.as.number);
+                }
+                break;
+            }
+            
+            case OP_LT: {
+                Value left = vm->registers[instr.B];
+                Value right = vm->registers[instr.C];
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    vm->registers[instr.A] = make_bool(left.as.number < right.as.number);
+                }
+                break;
+            }
+            
+            case OP_LE: {
+                Value left = vm->registers[instr.B];
+                Value right = vm->registers[instr.C];
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    vm->registers[instr.A] = make_bool(left.as.number <= right.as.number);
+                }
+                break;
+            }
+            
+            case OP_EQ: {
+                Value left = vm->registers[instr.B];
+                Value right = vm->registers[instr.C];
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    vm->registers[instr.A] = make_bool(left.as.number == right.as.number);
+                }
+                break;
             }
             
             case OP_HALT: {
                 return 0;
-            }
-            
-            case OP_ADD: {
-                Value right = pop(vm);
-                Value left = pop(vm);
-                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
-                    push(vm, make_number(left.as.number + right.as.number));
-                }
-                break;
-            }
-            case OP_SUBTRACT: {
-                Value right = pop(vm);
-                Value left = pop(vm);
-                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
-                    push(vm, make_number(left.as.number - right.as.number));
-                }
-                break;
-            }
-            case OP_MULTIPLY: {
-                Value right = pop(vm);
-                Value left = pop(vm);
-                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
-                    push(vm, make_number(left.as.number * right.as.number));
-                }
-                break;
-            }
-            case OP_DIVIDE: {
-                Value right = pop(vm);
-                Value left = pop(vm);
-                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
-                    push(vm, make_number(left.as.number / right.as.number));
-                }
-                break;
             }
             
             default:
