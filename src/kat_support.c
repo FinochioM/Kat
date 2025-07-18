@@ -1,14 +1,26 @@
 #include "minimal_headers.h"
+#include "klex.h"
 
 /* Simple string creation */
 TString *katS_newlstr (kat_State *K, const char *str, size_t l) {
-  TString *ts = (TString *)malloc(sizeof(TString) + l);
-  ts->extra = 0;
-  ts->len = l;
-  memcpy(ts->contents, str, l);
-  ts->contents[l] = '\0';
-  return ts;
-}
+    for (int i = 0; i < NUM_RESERVED; i++) {
+      if (strlen(katX_tokens[i]) == l && memcmp(katX_tokens[i], str, l) == 0) {
+        TString *ts = (TString *)malloc(sizeof(TString) + l);
+        ts->extra = i + 1;  // Mark as reserved word
+        ts->len = l;
+        memcpy(ts->contents, str, l);
+        ts->contents[l] = '\0';
+        return ts;
+      }
+    }
+    
+    TString *ts = (TString *)malloc(sizeof(TString) + l);
+    ts->extra = 0;  // Not reserved
+    ts->len = l;
+    memcpy(ts->contents, str, l);
+    ts->contents[l] = '\0';
+    return ts;
+  }
 
 TString *katS_new (kat_State *K, const char *str) {
   return katS_newlstr(K, str, strlen(str));
