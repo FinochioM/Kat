@@ -4,6 +4,9 @@
 #include "parser.h"
 #include <stddef.h>
 
+#define MAX_VARS 256
+
+// Opcodes básicos inspirados en Lua
 typedef enum {
     OP_LOADK,
     OP_LOADVAR,
@@ -29,16 +32,23 @@ typedef struct {
 } Instruction;
 
 typedef struct {
+    char *name;
+} VarInfo;
+
+typedef struct {
     Instruction *code;
     size_t code_size;
     size_t code_capacity;
     int *constants;
     size_t const_size;
     size_t const_capacity;
+    VarInfo vars[MAX_VARS];
+    int var_count;
 } Proto;
 
 Proto *codegen_generate(const ASTNode *ast);
 void codegen_free(Proto *proto);
 void codegen_print(const Proto *proto);
+int codegen_get_var_index(Proto *proto, const char *name, int create);
 
 #endif 

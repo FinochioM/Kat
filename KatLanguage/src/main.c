@@ -94,29 +94,15 @@ int main(int argc, char **argv) {
     printf("Welcome to KatLanguage\n");
     const char *source =
         "package main\n"
-        "import \"core:fmt\"\n"
         "proc :: main() {\n"
         "    x := 42\n"
-        "    x := 100\n"
-        "    y = 10\n"
-        "    z := 5\n"
-        "    z = 7\n"
-        "    if z > 0 {\n"
-        "        z := 1\n"
-        "        z := 2\n"
-        "        a = 3\n"
-        "    }\n"
-        "}\n"
-        "proc :: main() {\n"
-        "    b := 1\n"
+        "    x = 100\n"
         "}\n";
     Lexer lexer;
     lexer_init(&lexer, source);
     Parser parser;
     parser_init(&parser, &lexer);
     ASTNode *ast = parse_program(&parser);
-    printf("\nAST:\n");
-    print_ast(ast, 0);
     semantic_check(ast);
     Proto *proto = codegen_generate(ast);
     codegen_print(proto);

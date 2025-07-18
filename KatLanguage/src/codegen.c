@@ -3,6 +3,26 @@
 #include <stdio.h>
 #include <string.h>
 
+static char *my_strndup(const char *s, size_t n) {
+    char *p = (char *)malloc(n + 1);
+    if (!p) return NULL;
+    memcpy(p, s, n);
+    p[n] = '\0';
+    return p;
+}
+
+int codegen_get_var_index(Proto *p, const char *name, int create) {
+    for (int i = 0; i < p->var_count; ++i) {
+        if (strcmp(p->vars[i].name, name) == 0) return i;
+    }
+    if (create) {
+        if (p->var_count >= MAX_VARS) return -1;
+        p->vars[p->var_count].name = strdup(name);
+        return p->var_count++;
+    }
+    return -1;
+}
+
 static void proto_emit(Proto *p, OpCode op, int a, int b, int c) {
     if (p->code_size == p->code_capacity) {
         p->code_capacity = p->code_capacity ? p->code_capacity * 2 : 16;
@@ -29,18 +49,27 @@ static void codegen_block(const ASTNode *node, Proto *p) {
 }
 
 static void codegen_var_decl(const ASTNode *node, Proto *p) {
+    if (!node->left || node->left->type != AST_IDENTIFIER) return;
+    char *name = my_strndup(node->left->token.lexeme, node->left->token.length);
+    int vidx = codegen_get_var_index(p, name, 1);
+    free(name);
     if (node->right && node->right->type == AST_LITERAL) {
         int kidx = proto_add_const(p, atoi(node->right->token.lexeme));
-        proto_emit(p, OP_LOADK, 0, kidx, 0);
-        proto_emit(p, OP_STOREVAR, 0, 0, 0);
+        proto_emit(p, OP_LOADK, vidx, kidx, 0);
+        proto_emit(p, OP_STOREVAR, vidx, vidx, 0);
     }
 }
 
 static void codegen_assign(const ASTNode *node, Proto *p) {
+    if (!node->left || node->left->type != AST_IDENTIFIER) return;
+    char *name = my_strndup(node->left->token.lexeme, node->left->token.length);
+    int vidx = codegen_get_var_index(p, name, 0);
+    free(name);
+    if (vidx < 0) return;
     if (node->right && node->right->type == AST_LITERAL) {
         int kidx = proto_add_const(p, atoi(node->right->token.lexeme));
-        proto_emit(p, OP_LOADK, 0, kidx, 0);
-        proto_emit(p, OP_STOREVAR, 0, 0, 0);
+        proto_emit(p, OP_LOADK, vidx, kidx, 0);
+        proto_emit(p, OP_STOREVAR, vidx, vidx, 0);
     }
 }
 
@@ -93,6 +122,7 @@ Proto *codegen_generate(const ASTNode *ast) {
 
 void codegen_free(Proto *proto) {
     if (!proto) return;
+    for (int i = 0; i < proto->var_count; ++i) free(proto->vars[i].name);
     free(proto->code);
     free(proto->constants);
     free(proto);
@@ -107,5 +137,9 @@ void codegen_print(const Proto *proto) {
     printf("Constants:\n");
     for (size_t i = 0; i < proto->const_size; ++i) {
         printf("  [%zu] = %d\n", i, proto->constants[i]);
+    }
+    printf("Variables:\n");
+    for (int i = 0; i < proto->var_count; ++i) {
+        printf("  [%d] = %s\n", i, proto->vars[i].name);
     }
 } 
