@@ -1,2 +1,3 @@
 template/
-KatLanguage/build/
+build/
+*.exe

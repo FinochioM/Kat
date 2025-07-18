@@ -6,7 +6,8 @@ static const char* keywords[] = {
     "defer", "cast", "transmute", "distinct", "opaque", "dynamic",
     "in", "not_in", "true", "false", "nil", "auto_cast", "context",
     "foreign", "export", "inline", "no_inline", "when", "where",
-    "case", "switch", "fallthrough", "variant"
+    "case", "switch", "fallthrough", "variant", "size_of", "align_of",
+    "type_of", "typeid_of", "offset_of"
 };
 
 static TokenType keyword_tokens[] = {
@@ -17,7 +18,8 @@ static TokenType keyword_tokens[] = {
     TOKEN_IN, TOKEN_NOT_IN, TOKEN_TRUE, TOKEN_FALSE, TOKEN_NIL, TOKEN_AUTO_CAST,
     TOKEN_CONTEXT, TOKEN_FOREIGN, TOKEN_EXPORT, TOKEN_INLINE, TOKEN_NO_INLINE,
     TOKEN_WHEN, TOKEN_WHERE, TOKEN_CASE, TOKEN_SWITCH, TOKEN_FALLTHROUGH,
-    TOKEN_VARIANT
+    TOKEN_VARIANT, TOKEN_SIZE_OF, TOKEN_ALIGN_OF, TOKEN_TYPE_OF, TOKEN_TYPEID_OF,
+    TOKEN_OFFSET_OF
 };
 
 static int keyword_count = sizeof(keywords) / sizeof(keywords[0]);
@@ -289,6 +291,9 @@ Token lexer_next_token(Lexer* lexer) {
             }
             return make_token(lexer, TOKEN_TILDE);
         case ':': 
+            if (match(lexer, '=')) {
+                return make_token(lexer, TOKEN_COLON_EQUAL);
+            }
             if (match(lexer, ':')) {
                 return make_token(lexer, TOKEN_DOUBLE_COLON);
             }
@@ -352,10 +357,16 @@ const char* token_type_to_string(TokenType type) {
         case TOKEN_SWITCH: return "switch";
         case TOKEN_FALLTHROUGH: return "fallthrough";
         case TOKEN_VARIANT: return "variant";
+        case TOKEN_SIZE_OF: return "size_of";
+        case TOKEN_ALIGN_OF: return "align_of";
+        case TOKEN_TYPE_OF: return "type_of";
+        case TOKEN_TYPEID_OF: return "typeid_of";
+        case TOKEN_OFFSET_OF: return "offset_of";
         case TOKEN_IDENTIFIER: return "IDENTIFIER";
         case TOKEN_STRING: return "STRING";
         case TOKEN_NUMBER: return "NUMBER";
         case TOKEN_CHARACTER: return "CHARACTER";
+        case TOKEN_COLON_EQUAL: return ":=";
         case TOKEN_DOUBLE_EQUAL: return "==";
         case TOKEN_NOT_EQUAL: return "!=";
         case TOKEN_LESS_EQUAL: return "<=";
