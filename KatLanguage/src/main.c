@@ -3,6 +3,7 @@
 #include "parser.h"
 #include "semantic.h"
 #include "codegen.h"
+#include "vm.h"
 
 const char *token_type_to_str(TokenType type) {
     switch (type) {
@@ -119,6 +120,7 @@ int main(int argc, char **argv) {
     semantic_check(ast);
     Proto *proto = codegen_generate(ast);
     codegen_print(proto);
+    vm_run(proto);
     codegen_free(proto);
     free_ast(ast);
     return 0;
