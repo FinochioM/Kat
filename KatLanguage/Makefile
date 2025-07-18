@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -I./src
-SRC = src/main.c src/lexer.c src/parser.c src/semantic.c
+SRC = src/main.c src/lexer.c src/parser.c src/semantic.c src/codegen.c
 OUT = build/katlang
 
 all: $(OUT)

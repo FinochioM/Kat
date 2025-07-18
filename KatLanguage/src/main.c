@@ -2,6 +2,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "semantic.h"
+#include "codegen.h"
 
 const char *token_type_to_str(TokenType type) {
     switch (type) {
@@ -116,6 +117,9 @@ int main(int argc, char **argv) {
     printf("\nAST:\n");
     print_ast(ast, 0);
     semantic_check(ast);
+    Proto *proto = codegen_generate(ast);
+    codegen_print(proto);
+    codegen_free(proto);
     free_ast(ast);
     return 0;
 } 
