@@ -95,8 +95,11 @@ int main(int argc, char **argv) {
     const char *source =
         "package main\n"
         "proc :: main() {\n"
-        "    x := 42\n"
-        "    x = 100\n"
+        "    x := 10\n"
+        "    y := 0\n"
+        "    if x > 5 {\n"
+        "        y := 1\n"
+        "    }\n"
         "}\n";
     Lexer lexer;
     lexer_init(&lexer, source);
