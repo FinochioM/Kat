@@ -18,7 +18,7 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(BUILD_DIR)/*.o $(TARGET)
+	del /Q build\*.o build\kat.exe 2>nul || echo "Files cleaned"
 
 test: $(TARGET)
 	./$(TARGET)

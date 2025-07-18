@@ -2,8 +2,7 @@
 #define klex_h
 
 #include <limits.h>
-#include "kobject.h"
-#include "kzio.h"
+#include "minimal_headers.h"
 
 #define FIRST_RESERVED	(UCHAR_MAX + 1)
 
