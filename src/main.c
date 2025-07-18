@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "codegen.h"
+#include "vm.h"
 
 char* read_file(const char* filename) {
     FILE* file = fopen(filename, "r");
@@ -69,10 +70,17 @@ void test_parser(const char* source) {
     generate_code(&gen, ast);
     print_bytecode(&gen);
     
+    printf("\n=== EXECUTION ===\n");
+    VM vm;
+    vm_init(&vm);
+    vm_run(&vm, &gen);
+    vm_free(&vm);
+    
     codegen_free(&gen);
     free_ast(ast);
     printf("\n");
 }
+
 
 int main(int argc, char* argv[]) {
     printf("Kat Language Compiler Test\n");
