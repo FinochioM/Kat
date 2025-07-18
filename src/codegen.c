@@ -57,7 +57,14 @@ static void generate_expression(CodeGen* gen, ASTNode* node) {
         case AST_BINARY_EXPR: {
             generate_expression(gen, node->binary_expr.left);
             generate_expression(gen, node->binary_expr.right);
-            emit_instruction(gen, OP_COMPARE, node->binary_expr.operator);
+            
+            switch (node->binary_expr.operator) {
+                case TOKEN_PLUS: emit_instruction(gen, OP_ADD, 0); break;
+                case TOKEN_MINUS: emit_instruction(gen, OP_SUBTRACT, 0); break;
+                case TOKEN_STAR: emit_instruction(gen, OP_MULTIPLY, 0); break;
+                case TOKEN_SLASH: emit_instruction(gen, OP_DIVIDE, 0); break;
+                default: emit_instruction(gen, OP_COMPARE, node->binary_expr.operator); break;
+            }
             break;
         }
         case AST_CALL_EXPR: {
@@ -148,6 +155,10 @@ void print_bytecode(CodeGen* gen) {
             case OP_JUMP_IF_FALSE: printf("JUMP_IF_FALSE %d\n", gen->instructions[i].operand); break;
             case OP_JUMP: printf("JUMP %d\n", gen->instructions[i].operand); break;
             case OP_COMPARE: printf("COMPARE %d\n", gen->instructions[i].operand); break;
+            case OP_ADD: printf("ADD\n"); break;
+            case OP_SUBTRACT: printf("SUBTRACT\n"); break;
+            case OP_MULTIPLY: printf("MULTIPLY\n"); break;
+            case OP_DIVIDE: printf("DIVIDE\n"); break;
             case OP_HALT: printf("HALT\n"); break;
         }
     }

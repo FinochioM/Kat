@@ -92,6 +92,8 @@ int main(int argc, char* argv[]) {
         "    name := \"Hello, World!\";\n"
         "    if x > 0 {\n"
         "        print(name);\n"
+        "        y := 10 + 10;\n"
+        "        print(y);\n"
         "    }\n"
         "    return 0;\n"
         "}\n";

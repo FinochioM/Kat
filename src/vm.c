@@ -286,6 +286,39 @@ int vm_run(VM* vm, CodeGen* code) {
                 return 0;
             }
             
+            case OP_ADD: {
+                Value right = pop(vm);
+                Value left = pop(vm);
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    push(vm, make_number(left.as.number + right.as.number));
+                }
+                break;
+            }
+            case OP_SUBTRACT: {
+                Value right = pop(vm);
+                Value left = pop(vm);
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    push(vm, make_number(left.as.number - right.as.number));
+                }
+                break;
+            }
+            case OP_MULTIPLY: {
+                Value right = pop(vm);
+                Value left = pop(vm);
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    push(vm, make_number(left.as.number * right.as.number));
+                }
+                break;
+            }
+            case OP_DIVIDE: {
+                Value right = pop(vm);
+                Value left = pop(vm);
+                if (left.type == VAL_NUMBER && right.type == VAL_NUMBER) {
+                    push(vm, make_number(left.as.number / right.as.number));
+                }
+                break;
+            }
+            
             default:
                 fprintf(stderr, "Unknown opcode %d\n", instr.opcode);
                 return -1;

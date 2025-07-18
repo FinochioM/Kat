@@ -442,11 +442,10 @@ static ASTNode* primary_expression(Parser* parser) {
     return NULL;
 }
 
-static ASTNode* comparison_expression(Parser* parser) {
+static ASTNode* factor_expression(Parser* parser) {
     ASTNode* expr = primary_expression(parser);
     
-    while (match(parser, TOKEN_GREATER) || match(parser, TOKEN_GREATER_EQUAL) ||
-           match(parser, TOKEN_LESS) || match(parser, TOKEN_LESS_EQUAL)) {
+    while (match(parser, TOKEN_STAR) || match(parser, TOKEN_SLASH)) {
         TokenType operator = parser->previous.type;
         ASTNode* right = primary_expression(parser);
         
@@ -461,12 +460,31 @@ static ASTNode* comparison_expression(Parser* parser) {
     return expr;
 }
 
-static ASTNode* equality_expression(Parser* parser) {
-    ASTNode* expr = comparison_expression(parser);
+static ASTNode* term_expression(Parser* parser) {
+    ASTNode* expr = factor_expression(parser);
     
-    while (match(parser, TOKEN_NOT_EQUAL) || match(parser, TOKEN_DOUBLE_EQUAL)) {
+    while (match(parser, TOKEN_PLUS) || match(parser, TOKEN_MINUS)) {
         TokenType operator = parser->previous.type;
-        ASTNode* right = comparison_expression(parser);
+        ASTNode* right = factor_expression(parser);
+        
+        ASTNode* binary = create_node(AST_BINARY_EXPR, parser->previous.line, parser->previous.column);
+        binary->binary_expr.left = expr;
+        binary->binary_expr.operator = operator;
+        binary->binary_expr.right = right;
+        
+        expr = binary;
+    }
+    
+    return expr;
+}
+
+static ASTNode* comparison_expression(Parser* parser) {
+    ASTNode* expr = term_expression(parser);
+    
+    while (match(parser, TOKEN_GREATER) || match(parser, TOKEN_GREATER_EQUAL) ||
+           match(parser, TOKEN_LESS) || match(parser, TOKEN_LESS_EQUAL)) {
+        TokenType operator = parser->previous.type;
+        ASTNode* right = term_expression(parser);
         
         ASTNode* binary = create_node(AST_BINARY_EXPR, parser->previous.line, parser->previous.column);
         binary->binary_expr.left = expr;
@@ -480,7 +498,7 @@ static ASTNode* equality_expression(Parser* parser) {
 }
 
 static ASTNode* expression(Parser* parser) {
-    return equality_expression(parser);
+    return comparison_expression(parser);
 }
 
 // Public functions

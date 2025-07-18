@@ -13,6 +13,10 @@ typedef enum {
     OP_JUMP_IF_FALSE,
     OP_JUMP,
     OP_COMPARE,
+    OP_ADD,        // +
+    OP_SUBTRACT,   // -
+    OP_MULTIPLY,   // *
+    OP_DIVIDE,     // /
     OP_HALT
 } OpCode;
 
