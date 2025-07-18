@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "lexer.h"
+#include "parser.h"
 
 char* read_file(const char* filename) {
     FILE* file = fopen(filename, "r");
@@ -28,9 +29,8 @@ char* read_file(const char* filename) {
     return buffer;
 }
 
-void test_lexer_string(const char* source) {
-    printf("Testing lexer with: \"%s\"\n", source);
-    printf("==========================================\n");
+void test_lexer_only(const char* source) {
+    printf("=== LEXER TEST ===\n");
     
     Lexer lexer;
     lexer_init(&lexer, source);
@@ -44,28 +44,50 @@ void test_lexer_string(const char* source) {
     printf("\n");
 }
 
+void test_parser(const char* source) {
+    printf("=== PARSER TEST ===\n");
+    
+    Lexer lexer;
+    lexer_init(&lexer, source);
+    
+    Parser parser;
+    parser_init(&parser, &lexer);
+    
+    ASTNode* ast = parse_program(&parser);
+    
+    if (parser.had_error) {
+        printf("Parser had errors.\n");
+    } else {
+        printf("AST:\n");
+        print_ast(ast, 0);
+    }
+    
+    free_ast(ast);
+    printf("\n");
+}
+
 int main(int argc, char* argv[]) {
-    printf("Kat Language Lexer Test\n");
-    printf("=======================\n\n");
+    printf("Kat Language Compiler Test\n");
+    printf("==========================\n\n");
+    
+    const char* test_code = 
+        "proc main() {\n"
+        "    x := 42;\n"
+        "    name := \"Hello, World!\";\n"
+        "    if x > 0 {\n"
+        "        print(name);\n"
+        "    }\n"
+        "    return 0;\n"
+        "}\n";
     
     if (argc > 1) {
         char* source = read_file(argv[1]);
         if (source) {
-            test_lexer_string(source);
+            test_parser(source);
             free(source);
         }
     } else {
-        const char* test_code = 
-            "proc main() {\n"
-            "    x := 42;\n"
-            "    name := \"Hello, World!\";\n"
-            "    if x > 0 {\n"
-            "        print(name);\n"
-            "    }\n"
-            "    return 0;\n"
-            "}\n";
-        
-        test_lexer_string(test_code);
+        test_parser(test_code);
     }
     
     return 0;
