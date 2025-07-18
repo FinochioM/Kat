@@ -13,7 +13,8 @@
 /* Forward declarations */
 static void statement (LexState *ls);
 static void expr (LexState *ls, expdesc *v);
-
+static void assignment (LexState *ls, TString *name);
+static void funcargs (LexState *ls, expdesc *f);
 /* Error handling */
 static l_noret error_expected (LexState *ls, int token) {
   (void)token;
@@ -270,9 +271,32 @@ static void assignment (LexState *ls, TString *name) {
     printf("Typed assignment: %.*s : <type> = <expr>\n", (int)name->len, name->contents);
   }
   else if (testnext(ls, TK_COLON_COLON)) {
-    /* x :: expr (constant) */
-    expr(ls, &e);
-    printf("Constant: %.*s :: <expr>\n", (int)name->len, name->contents);
+    /* x :: expr (constant) OR x :: proc(...) */
+    if (ls->t.token == TK_PROC) {
+      /* This is a procedure declaration */
+      printf("Procedure declaration: %.*s :: proc\n", (int)name->len, name->contents);
+      katX_next(ls); /* skip 'proc' */
+      checknext(ls, '(');
+      checknext(ls, ')');
+      
+      if (testnext(ls, TK_ARROW)) {
+        expdesc ret_type;
+        expr(ls, &ret_type);
+        printf("Return type specified\n");
+      }
+      
+      checknext(ls, '{');
+      printf("Procedure body:\n");
+      
+      while (ls->t.token != '}' && ls->t.token != TK_EOS) {
+        statement(ls);
+      }
+      checknext(ls, '}');
+    } else {
+      /* Regular constant */
+      expr(ls, &e);
+      printf("Constant: %.*s :: <expr>\n", (int)name->len, name->contents);
+    }
   }
   else {
     katX_syntaxerror(ls, "expected ':=', ':', or '::'");
@@ -417,7 +441,26 @@ static void statement (LexState *ls) {
     }
     case TK_NAME: {
       TString *name = str_checkname(ls);
-      assignment(ls, name);
+      
+      /* Check what follows the name */
+      if (ls->t.token == TK_COLON_EQ || ls->t.token == ':' || ls->t.token == TK_COLON_COLON) {
+        /* It's an assignment */
+        assignment(ls, name);
+      }
+      else {
+        /* It's an expression statement (function call, etc.) */
+        if (ls->t.token == '(') {
+          /* Function call */
+          expdesc func;
+          init_exp(&func, KNAME);
+          func.u.name = name;
+          funcargs(ls, &func);
+          printf("Function call: %.*s(...)\n", (int)name->len, name->contents);
+        }
+        else {
+          katX_syntaxerror(ls, "unexpected symbol after name");
+        }
+      }
       break;
     }
     default: {
