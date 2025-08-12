@@ -27,6 +27,6 @@ public:
 
     BinaryOperation(std::unique_ptr<Expression> l,
                     std::string op,
-                    strd::unique_ptr<Expression> r)
+                    std::unique_ptr<Expression> r)
                 : left(std::move(l)), operator_token(op), right(std::move(r)) {}
 };

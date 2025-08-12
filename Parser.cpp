@@ -2,7 +2,7 @@
 #include <iostream>
 #include <stdexcept>
 
-Parser::Parser(Lexer& lexer) : lexer(lexer) {
+Parser::Parser(Lexer& lexer) : lexer(lexer), currentToken(TokenType::UNKNOWN, "", 1, 1) {
     advance();
 }
 
@@ -14,7 +14,7 @@ void Parser::expect(TokenType type) {
     if (currentToken.type != type) {
         throw std::runtime_error("Unexpected token: expected " +
                                 std::to_string(static_cast<int>(type)) +
-                                " but got " + currenToken.value);
+                                " but got " + currentToken.value);
     }
     advance();
 }
@@ -26,7 +26,7 @@ std::unique_ptr<Expression> Parser::parse() {
 std::unique_ptr<Expression> Parser::parseExpression() {
     auto left = parseTerm();
 
-    while (currenToken.type == TokenType::PLUS || currentToken.type == TokenType::MINUS) {
+    while (currentToken.type == TokenType::PLUS || currentToken.type == TokenType::MINUS) {
         std::string op = currentToken.value;
         advance();
         auto right = parseTerm();
@@ -37,11 +37,11 @@ std::unique_ptr<Expression> Parser::parseExpression() {
 }
 
 std::unique_ptr<Expression> Parser::parseTerm() {
-    parseFactor();
+    return parseFactor();
 }
 
 std::unique_ptr<Expression> Parser::parseFactor() {
-    if (currenToken.type == TokenType::NUMBER) {
+    if (currentToken.type == TokenType::NUMBER) {
         int value = std::stoi(currentToken.value);
         advance();
         return std::make_unique<NumberLiteral>(value);

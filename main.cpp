@@ -1,37 +1,36 @@
 #include <iostream>
 #include "Lexer.h"
-#include "Token.h"
+#include "Parser.h"
+#include "AST.h"
 
-const char* tokenTypeToString(TokenType type) {
-    switch (type) {
-        case TokenType::NUMBER: return "NUMBER";
-        case TokenType::IDENTIFIER: return "IDENTIFIER";
-        case TokenType::PLUS: return "PLUS";
-        case TokenType::MINUS: return "MINUS";
-        case TokenType::EOF_TOKEN: return "EOF";
-        case TokenType::UNKNOWN: return "UNKNOWN";
-        default: return "UNKNOWN";
+void printAST(Expression* expr, int depth = 0) {
+    std::string indent(depth * 2, ' ');
+
+    if (auto* num = dynamic_cast<NumberLiteral*>(expr)) {
+        std::cout << indent << "Number: " << num->value << std::endl;
+    } else if (auto* binOp = dynamic_cast<BinaryOperation*>(expr)) {
+        std::cout << indent << "BinaryOp: " << binOp->operator_token << std::endl;
+        std::cout << indent << "Left: " << std::endl;
+        printAST(binOp->left.get(), depth + 1);
+        std::cout << indent << "Right: " << std::endl;
+        printAST(binOp->right.get(), depth +1);
     }
 }
 
 int main() {
-    std::string source = "123 + hello - 456 world";
+    std::string source = "123 + 456 - 789";
 
-    std::cout << "Tokenizando: \"" << source << "\"\n\n";
+    std::cout << "Parsing: \"" << source << "\"\n\n";
 
     Lexer lexer(source);
+    Parser parser(lexer);
 
-    while (true) {
-        Token token = lexer.nextToken();
-
-        std::cout << "Token: " << tokenTypeToString(token.type)
-                  << " | Value: \"" << token.value << "\" "
-                  << " | Line: " << token.line
-                  << " | Column: " << token.column << std::endl;
-
-        if (token.type == TokenType::EOF_TOKEN) {
-            break;
-        }
+    try {
+        auto ast = parser.parse();
+        std::cout << "AST Structure:\n";
+        printAST(ast.get());
+    } catch (const std::exception& e) {
+        std::cout << "Parse error: " << e.what() << std::endl;
     }
 
     return 0;
