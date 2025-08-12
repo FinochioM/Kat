@@ -24,11 +24,11 @@ int main() {
     while (true) {
         Token token = lexer.nextToken();
 
-        std::cout << "Token: " << tokenTypeToString(token.type) 
+        std::cout << "Token: " << tokenTypeToString(token.type)
                   << " | Value: \"" << token.value << "\" "
-                  << " | Line: " << token.line 
+                  << " | Line: " << token.line
                   << " | Column: " << token.column << std::endl;
-        
+
         if (token.type == TokenType::EOF_TOKEN) {
             break;
         }
